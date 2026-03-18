@@ -23,11 +23,18 @@ export default function FlameField({ selectedIndex, overlayOpen }: Props) {
 
   const configs = useMemo(() => {
     const total = colleagues.length;
-    const rings = [
-      { count: 10, radius: 0.17 },
-      { count: 14, radius: 0.27 },
-      { count: 10, radius: 0.36 },
-    ];
+    const mobile = typeof window !== "undefined" && window.innerWidth < 768;
+    const rings = mobile
+      ? [
+          { count: 10, radius: 0.14 },
+          { count: 14, radius: 0.22 },
+          { count: 10, radius: 0.30 },
+        ]
+      : [
+          { count: 10, radius: 0.17 },
+          { count: 14, radius: 0.27 },
+          { count: 10, radius: 0.36 },
+        ];
 
     // Fixed rotation speed per ring — keeps the formation intact
     const ringSpeeds = [0.00008, -0.00006, 0.00005];
@@ -59,7 +66,7 @@ export default function FlameField({ selectedIndex, overlayOpen }: Props) {
           wobbleRadius: 3 + seededRandom(flameIndex * 3 + 2) * 6,
           phase: seededRandom(flameIndex * 11) * Math.PI * 2,
           depth: 0.85 + seededRandom(flameIndex * 13) * 0.3,
-          size: 52,
+          size: typeof window !== "undefined" && window.innerWidth < 768 ? 28 : 52,
         });
       }
     }
