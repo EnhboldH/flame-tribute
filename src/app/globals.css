@@ -659,11 +659,15 @@ footer .footer-credit {
 @media (max-width: 600px) {
   .sphere-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
+    gap: 0.8rem;
   }
 
-  .hero-mountains svg {
-    height: 100px;
+  .sphere-name {
+    font-size: 0.55rem;
+  }
+
+  .hero-mountains {
+    height: 20%;
   }
 
   .bottomsheet {

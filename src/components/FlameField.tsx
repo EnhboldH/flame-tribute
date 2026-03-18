@@ -171,8 +171,9 @@ export default function FlameField({ selectedIndex, overlayOpen }: Props) {
           tx = hx + (cvx - hx) * ep;
           ty = hy + (cvy - hy) * ep;
 
-          // Scale flame to fill 88% of the card when settled
-          targetScale = (rect.width * 0.88) / cfg.size;
+          // Scale flame to fill the card when settled, capped to avoid overflow
+          const maxSphereSize = Math.min(rect.width, rect.height) * 0.75;
+          targetScale = maxSphereSize / cfg.size;
         }
 
         const parallaxY = scrollY * (1 - cfg.depth) * 0.2 * orbitDampen;
