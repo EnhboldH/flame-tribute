@@ -20,12 +20,13 @@ export default function ColleagueCard({ name, index, colors, gradientAngle, onCl
 
     // Only show name once flames have settled (scroll past hero + grid intro)
     function checkScroll() {
+      if (!card) return;
       const vh = window.innerHeight;
       const threshold = vh * 0.5;
       if (window.scrollY > threshold) {
         const rect = card.getBoundingClientRect();
         if (rect.top < vh * 0.9) {
-          setTimeout(() => card.classList.add("visible"), (index % 5) * 120);
+          setTimeout(() => card?.classList.add("visible"), (index % 5) * 120);
           window.removeEventListener("scroll", checkScroll);
         }
       }
