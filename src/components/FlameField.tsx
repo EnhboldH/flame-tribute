@@ -19,10 +19,7 @@ interface Props {
 
 export default function FlameField({ selectedIndex, overlayOpen }: Props) {
   const flameRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const glowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const animRef = useRef<number>(0);
-
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 
   const configs = useMemo(() => {
     const total = colleagues.length;
@@ -39,7 +36,9 @@ export default function FlameField({ selectedIndex, overlayOpen }: Props) {
           { count: 10, radius: 0.36 },
         ];
 
+    // Fixed rotation speed per ring — keeps the formation intact
     const ringSpeeds = [0.00008, -0.00006, 0.00005];
+    // 3D tilt angle per ring (radians) — creates depth illusion
     const ringTilts = [0.55, 0.4, 0.3];
 
     let flameIndex = 0;
@@ -64,10 +63,10 @@ export default function FlameField({ selectedIndex, overlayOpen }: Props) {
           ringSpeed: ringSpeeds[r],
           ringTilt: ringTilts[r],
           wobbleSpeed: 0.0003 + seededRandom(flameIndex * 7) * 0.0004,
-          wobbleRadius: mobile ? 2 : 3 + seededRandom(flameIndex * 3 + 2) * 6,
+          wobbleRadius: 3 + seededRandom(flameIndex * 3 + 2) * 6,
           phase: seededRandom(flameIndex * 11) * Math.PI * 2,
           depth: 0.85 + seededRandom(flameIndex * 13) * 0.3,
-          size: mobile ? 10 : 52,
+          size: typeof window !== "undefined" && window.innerWidth < 768 ? 28 : 52,
         });
       }
     }
@@ -86,36 +85,17 @@ export default function FlameField({ selectedIndex, overlayOpen }: Props) {
   useEffect(() => {
     let cardEls: HTMLElement[] = [];
     let startTime = -1;
-    const INTRO_DURATION = 5000;
-
-    // Cache card positions as PAGE-relative (stable, don't change with scroll)
-    let cachedRects: { pageX: number; pageY: number; w: number; h: number }[] = [];
+    const INTRO_DURATION = 5000; // ms for the full fall-in sequence
 
     function queryCards() {
       const els = document.querySelectorAll<HTMLElement>("[data-flame-index]");
       cardEls = Array.from(els).sort(
         (a, b) => Number(a.dataset.flameIndex) - Number(b.dataset.flameIndex)
       );
-      cacheRects();
-    }
-
-    function cacheRects() {
-      const sy = window.scrollY;
-      const sx = window.scrollX;
-      cachedRects = cardEls.map((el) => {
-        const rect = el.getBoundingClientRect();
-        return {
-          pageX: rect.left + rect.width / 2 + sx,
-          pageY: rect.top + rect.height / 2 + sy,
-          w: rect.width,
-          h: rect.height,
-        };
-      });
     }
 
     const t1 = setTimeout(queryCards, 100);
     const t2 = setTimeout(queryCards, 800);
-    const t3 = setTimeout(queryCards, 2000);
     window.addEventListener("resize", queryCards);
 
     function animate(time: number) {
@@ -131,12 +111,17 @@ export default function FlameField({ selectedIndex, overlayOpen }: Props) {
       const progress = Math.max(0, Math.min(1, rawProgress));
       const ep = easeInOutCubic(progress);
 
+      // Intro progress: 0 = just started (balls at top), 1 = fully in orbit
       const elapsed = time - startTime;
+      // Stagger: each ball falls with a slight delay based on index
+      const introBase = Math.max(0, Math.min(1, elapsed / INTRO_DURATION));
+      const introEased = easeInOutCubic(introBase);
 
       configs.forEach((cfg, i) => {
         const el = flameRefs.current[i];
         if (!el) return;
 
+        // Per-flame stagger: one by one, spread over the full intro duration
         const stagger = i * 120;
         const flameDuration = 800;
         const flameIntro = Math.max(0, Math.min(1, (elapsed - stagger) / flameDuration));
@@ -148,23 +133,29 @@ export default function FlameField({ selectedIndex, overlayOpen }: Props) {
         const minDim = Math.min(vw, vh);
         const ringR = cfg.ringRadius * minDim;
 
+        // All flames in the same ring rotate at the same speed — formation holds
         const ringRotation = time * cfg.ringSpeed;
         const baseAngle = cfg.angle + ringRotation;
 
+        // 3D orbit: X stays circular, Y is compressed by tilt, Z gives depth
         const orbitX = Math.cos(baseAngle) * ringR;
-        const orbitZ = Math.sin(baseAngle);
-        const orbitY = Math.sin(baseAngle) * ringR * Math.cos(cfg.ringTilt);
+        const orbitZ = Math.sin(baseAngle); // -1 to 1 (behind to front)
+        const orbitY = Math.sin(baseAngle) * ringR * Math.cos(cfg.ringTilt); // compressed Y
 
-        const depthScale = 0.7 + (orbitZ + 1) * 0.3;
+        // Depth-based scale: flames in "front" are bigger, "behind" are smaller
+        const depthScale = 0.7 + (orbitZ + 1) * 0.3; // 0.7 to 1.3
 
+        // Fall-in start position: spread across top, above viewport
         const fallStartX = cx + (seededRandom(i * 19) - 0.5) * vw * 0.8;
         const fallStartY = -80 - seededRandom(i * 29) * vh * 0.3;
 
+        // Orbit position
         const orbitPosX = cx + orbitX +
           Math.cos(time * cfg.wobbleSpeed + cfg.phase) * cfg.wobbleRadius * orbitDampen;
         const orbitPosY = cy + orbitY +
           Math.sin(time * cfg.wobbleSpeed * 0.7 + cfg.phase) * cfg.wobbleRadius * 0.6 * orbitDampen;
 
+        // Blend: fall start → orbit position
         const hx = fallStartX + (orbitPosX - fallStartX) * fi;
         const hy = fallStartY + (orbitPosY - fallStartY) * fi;
 
@@ -172,40 +163,40 @@ export default function FlameField({ selectedIndex, overlayOpen }: Props) {
         let ty = hy;
         let targetScale = 1.0;
 
-        const cached = cachedRects[i];
-        if (cached) {
-          // Convert page-relative to viewport-relative each frame
-          const cvx = cached.pageX - window.scrollX;
-          const cvy = cached.pageY - scrollY;
+        const cardEl = cardEls[i];
+        if (cardEl) {
+          const rect = cardEl.getBoundingClientRect();
+          const cvx = rect.left + rect.width / 2;
+          const cvy = rect.top + rect.height / 2;
           tx = hx + (cvx - hx) * ep;
           ty = hy + (cvy - hy) * ep;
 
-          const maxPx = Math.min(cached.w, cached.h) * 0.4;
-          targetScale = maxPx / cfg.size;
+          // Scale flame to fill the card when settled, capped to avoid overflow
+          const maxSphereSize = Math.min(rect.width, rect.height) * 0.75;
+          targetScale = maxSphereSize / cfg.size;
         }
 
         const parallaxY = scrollY * (1 - cfg.depth) * 0.2 * orbitDampen;
-        // Center the element: offset by half the base size (transform-origin is center due to scale)
         const fx = tx - cfg.size / 2;
         const fy = ty - cfg.size / 2 + parallaxY;
 
-        // Use transform-origin center so scaling doesn't shift position
-        el.style.transformOrigin = 'center center';
-
+        // Scale: depth-scaled in hero → fill the card when settled
         const heroS = depthScale;
         const scale = heroS + (targetScale - heroS) * ep;
 
-        const breathe = 1 + Math.sin(time * 0.001 + cfg.phase) * 0.02;
+        const breathe = 1 + Math.sin(time * 0.0008 + cfg.phase) * 0.02;
 
-        const heroOpacity = 0.5 + (orbitZ + 1) * 0.25;
+        // Depth-based opacity in hero (back = dimmer), full when settled
+        const heroOpacity = 0.5 + (orbitZ + 1) * 0.25; // 0.5 to 1.0
         const baseOpacity = heroOpacity + (0.9 - heroOpacity) * ep;
+        // Fade in during intro
         const opacity = baseOpacity * Math.min(1, fi * 1.5);
 
         el.style.transform = `translate3d(${fx}px, ${fy}px, 0) scale(${scale * breathe})`;
         el.style.opacity = String(opacity);
 
-        // Glow — use cached ref, no DOM query per frame
-        const glowEl = glowRefs.current[i];
+        // Glow intensifies when settled
+        const glowEl = el.querySelector('.flame-glow') as HTMLElement;
         if (glowEl) {
           const settledGlow = ep > 0.7 ? 0.3 + (ep - 0.7) / 0.3 * 0.25 : 0.3;
           glowEl.style.opacity = String(settledGlow);
@@ -219,7 +210,6 @@ export default function FlameField({ selectedIndex, overlayOpen }: Props) {
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
-      clearTimeout(t3);
       window.removeEventListener("resize", queryCards);
       cancelAnimationFrame(animRef.current);
     };
@@ -242,10 +232,7 @@ export default function FlameField({ selectedIndex, overlayOpen }: Props) {
         >
           <div className="flame-body">
             <div className="flame-core" />
-            <div
-              className="flame-glow"
-              ref={(el) => { glowRefs.current[i] = el; }}
-            />
+            <div className="flame-glow" />
           </div>
         </div>
       ))}
