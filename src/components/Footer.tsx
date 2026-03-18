@@ -5,7 +5,7 @@ export default function Footer() {
     <footer>
       <KheeUgalz className="footer-ornament" />
       <p>Seen. Valued. Remembered.</p>
-      <p className="footer-sub">A tribute, with respect</p>
+      <p className="footer-credit">Special thanks to Ebo for bringing this landing page to life</p>
     </footer>
   );
 }

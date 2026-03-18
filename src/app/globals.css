@@ -131,17 +131,19 @@ body {
 
 .flame-glow {
   position: absolute;
-  inset: -35%;
+  inset: -60%;
   border-radius: 50%;
   background: radial-gradient(
     circle,
     var(--color-from, #ffa726) 0%,
+    var(--color-to, #ff7043) 35%,
     transparent 70%
   );
-  opacity: 0.2;
-  filter: blur(8px);
+  opacity: 0.3;
+  filter: blur(16px);
   animation: flameGlowPulse 5s ease-in-out infinite;
   animation-delay: var(--flame-delay, 0s);
+  transition: opacity 0.8s ease;
 }
 
 .flame-element.flame-selected .flame-body {
@@ -231,24 +233,19 @@ body {
   color: var(--sand);
 }
 
-/* Mongolian mountain ornament */
+/* Mongolian mountain ornament (ugalz.png) */
 .hero-mountains {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   z-index: 2;
+  height: 35%;
+  background: url('/ugalz.png') center bottom / 100% auto no-repeat;
   opacity: 0;
+  filter: invert(1) brightness(0.35) sepia(0.3) hue-rotate(10deg);
   animation: fadeIn 1.5s ease 1s forwards;
-}
-
-.hero-mountains svg {
-  width: 100%;
-  height: auto;
-}
-
-.khee-ugalz.mountains {
-  color: var(--sand);
+  pointer-events: none;
 }
 
 .scroll-hint {
@@ -306,7 +303,7 @@ body {
   max-width: 1100px;
   margin: 0 auto;
   position: relative;
-  z-index: 2;
+  z-index: 6;
 }
 
 .sphere-grid {
@@ -323,80 +320,35 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
-  transform: translateY(20px) scale(0.9);
-  transition: opacity 0.8s ease, transform 0.8s ease;
 }
 
-.sphere-card.visible {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
+/* Card sphere is hidden — FlameField flames ARE the spheres.
+   They travel from hero and settle here. */
 .sphere-card::before {
-  content: '';
-  position: absolute;
-  width: 88%;
-  height: 88%;
-  border-radius: 50%;
-  background: linear-gradient(
-    var(--gradient-angle, 135deg),
-    var(--color-from, #ffa726),
-    var(--color-to, #ff7043)
-  );
-  transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.sphere-card:hover::before {
-  width: 92%;
-  height: 92%;
-  filter: brightness(1.1);
-}
-
-.sphere-card.card-reacting::before {
-  animation: spherePulse 0.45s cubic-bezier(0.23, 1, 0.32, 1);
+  display: none;
 }
 
 .sphere-glow {
-  position: absolute;
-  width: 110%;
-  height: 110%;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    var(--color-from, #ffa726) 0%,
-    transparent 70%
-  );
-  opacity: 0.18;
-  filter: blur(18px);
-  transition: opacity 0.6s ease, filter 0.6s ease;
-  z-index: -1;
-}
-
-.sphere-card:hover .sphere-glow {
-  opacity: 0.35;
-  filter: blur(22px);
-}
-
-.sphere-card.card-reacting .sphere-glow {
-  opacity: 0.5;
+  display: none;
 }
 
 .sphere-name {
-  position: absolute;
-  bottom: 2px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 2;
+  position: relative;
+  z-index: 10;
   font-family: var(--sans);
-  font-weight: 400;
-  font-size: 0.6rem;
-  color: rgba(255,255,255,0.8);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  text-shadow: 0 1px 6px rgba(0,0,0,0.7);
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: #ffffff;
+  -webkit-text-stroke: 0.3px rgba(255,255,255,0.5);
+  letter-spacing: 0.05em;
   pointer-events: none;
   white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.8s ease 0.3s;
+}
+
+.sphere-card.visible .sphere-name {
+  opacity: 1;
 }
 
 /* ─── BOTTOM SHEET ─── */
@@ -497,10 +449,10 @@ body {
   text-align: center;
 }
 
-/* Bottom sheet gradient sphere */
+/* Bottom sheet gradient sphere — subtle on-fire effect */
 .bottomsheet-sphere {
-  width: 100px;
-  height: 100px;
+  width: 110px;
+  height: 110px;
   margin: 0 auto 2rem;
   position: relative;
   border-radius: 50%;
@@ -509,20 +461,41 @@ body {
     var(--color-from, #ffa726),
     var(--color-to, #ff7043)
   );
-  animation: flameBreath 6s ease-in-out infinite;
+  animation: flameBreath 4s ease-in-out infinite;
+  box-shadow:
+    0 0 20px var(--color-from),
+    0 0 40px var(--color-from),
+    0 0 60px rgba(255,120,50,0.15);
 }
 
+/* Outer glow — pulsing warm light */
 .bottomsheet-sphere-glow {
   position: absolute;
-  inset: -40%;
+  inset: -55%;
   border-radius: 50%;
   background: radial-gradient(
     circle,
     var(--color-from, #ffa726) 0%,
+    var(--color-to, #ff7043) 30%,
     transparent 70%
   );
-  opacity: 0.2;
-  filter: blur(10px);
+  opacity: 0.25;
+  filter: blur(18px);
+  animation: fireGlow 3s ease-in-out infinite;
+}
+
+/* Rising ember/heat shimmer */
+.bottomsheet-sphere::after {
+  content: '';
+  position: absolute;
+  inset: -10%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse 60% 80% at 50% 30%,
+    rgba(255,200,100,0.12) 0%,
+    transparent 60%
+  );
+  animation: fireShimmer 2.5s ease-in-out infinite;
 }
 
 .bottomsheet-name {
@@ -596,13 +569,12 @@ footer p {
   letter-spacing: 0.08em;
 }
 
-footer .footer-sub {
+footer .footer-credit {
   font-family: var(--sans);
   font-weight: 300;
-  font-size: 0.7rem;
+  font-size: 12px;
   color: var(--sand-dim);
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
+  letter-spacing: 0.05em;
   margin-top: 1.5rem;
   opacity: 0.5;
 }
@@ -651,6 +623,19 @@ footer .footer-sub {
 @keyframes flameGlowPulse {
   0%, 100% { opacity: 0.2; transform: scale(1); }
   50%      { opacity: 0.3; transform: scale(1.05); }
+}
+
+@keyframes fireGlow {
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  30%      { opacity: 0.35; transform: scale(1.05); }
+  60%      { opacity: 0.25; transform: scale(0.97); }
+  80%      { opacity: 0.3; transform: scale(1.03); }
+}
+
+@keyframes fireShimmer {
+  0%, 100% { opacity: 0.6; transform: scale(1) translateY(0); }
+  40%      { opacity: 1; transform: scale(1.04) translateY(-3px); }
+  70%      { opacity: 0.5; transform: scale(0.98) translateY(1px); }
 }
 
 @keyframes spherePulse {

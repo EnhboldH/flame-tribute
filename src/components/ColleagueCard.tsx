@@ -17,19 +17,22 @@ export default function ColleagueCard({ name, index, colors, gradientAngle, onCl
   useEffect(() => {
     const card = cardRef.current;
     if (!card) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setTimeout(() => card.classList.add("visible"), (index % 5) * 100);
-            observer.unobserve(card);
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
-    observer.observe(card);
-    return () => observer.disconnect();
+
+    // Only show name once flames have settled (scroll past hero + grid intro)
+    function checkScroll() {
+      const vh = window.innerHeight;
+      const threshold = vh * 0.5;
+      if (window.scrollY > threshold) {
+        const rect = card.getBoundingClientRect();
+        if (rect.top < vh * 0.9) {
+          setTimeout(() => card.classList.add("visible"), (index % 5) * 120);
+          window.removeEventListener("scroll", checkScroll);
+        }
+      }
+    }
+
+    window.addEventListener("scroll", checkScroll, { passive: true });
+    return () => window.removeEventListener("scroll", checkScroll);
   }, [index]);
 
   const handleClick = useCallback(() => {

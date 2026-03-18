@@ -29,24 +29,34 @@ export default function FlameField({ selectedIndex, overlayOpen }: Props) {
       { count: 10, radius: 0.36 },
     ];
 
+    // Fixed rotation speed per ring — keeps the formation intact
+    const ringSpeeds = [0.00008, -0.00006, 0.00005];
+    // 3D tilt angle per ring (radians) — creates depth illusion
+    const ringTilts = [0.55, 0.4, 0.3];
+
     let flameIndex = 0;
     const items: {
       angle: number;
       ringRadius: number;
-      orbitRadius: number;
-      orbitSpeed: number;
+      ringSpeed: number;
+      ringTilt: number;
+      wobbleSpeed: number;
+      wobbleRadius: number;
       phase: number;
       depth: number;
       size: number;
     }[] = [];
 
-    for (const ring of rings) {
+    for (let r = 0; r < rings.length; r++) {
+      const ring = rings[r];
       for (let j = 0; j < ring.count && flameIndex < total; j++, flameIndex++) {
         items.push({
           angle: (j / ring.count) * Math.PI * 2,
           ringRadius: ring.radius,
-          orbitRadius: 6 + seededRandom(flameIndex * 3 + 2) * 12,
-          orbitSpeed: 0.00012 + seededRandom(flameIndex * 7) * 0.00025,
+          ringSpeed: ringSpeeds[r],
+          ringTilt: ringTilts[r],
+          wobbleSpeed: 0.0003 + seededRandom(flameIndex * 7) * 0.0004,
+          wobbleRadius: 3 + seededRandom(flameIndex * 3 + 2) * 6,
           phase: seededRandom(flameIndex * 11) * Math.PI * 2,
           depth: 0.85 + seededRandom(flameIndex * 13) * 0.3,
           size: 52,
@@ -67,6 +77,8 @@ export default function FlameField({ selectedIndex, overlayOpen }: Props) {
 
   useEffect(() => {
     let cardEls: HTMLElement[] = [];
+    let startTime = -1;
+    const INTRO_DURATION = 5000; // ms for the full fall-in sequence
 
     function queryCards() {
       const els = document.querySelectorAll<HTMLElement>("[data-flame-index]");
@@ -80,41 +92,69 @@ export default function FlameField({ selectedIndex, overlayOpen }: Props) {
     window.addEventListener("resize", queryCards);
 
     function animate(time: number) {
+      if (startTime < 0) startTime = time;
       const scrollY = window.scrollY;
       const vh = window.innerHeight;
       const vw = window.innerWidth;
 
       const heroHeight = vh;
-      const gridTopEstimate = heroHeight + 180;
-      const transStart = heroHeight * 0.15;
-      const transEnd = gridTopEstimate + vh * 0.15;
+      const transStart = heroHeight * 0.05;
+      const transEnd = heroHeight * 0.7;
       const rawProgress = (scrollY - transStart) / (transEnd - transStart);
       const progress = Math.max(0, Math.min(1, rawProgress));
       const ep = easeInOutCubic(progress);
 
+      // Intro progress: 0 = just started (balls at top), 1 = fully in orbit
+      const elapsed = time - startTime;
+      // Stagger: each ball falls with a slight delay based on index
+      const introBase = Math.max(0, Math.min(1, elapsed / INTRO_DURATION));
+      const introEased = easeInOutCubic(introBase);
+
       configs.forEach((cfg, i) => {
         const el = flameRefs.current[i];
         if (!el) return;
+
+        // Per-flame stagger: one by one, spread over the full intro duration
+        const stagger = i * 120;
+        const flameDuration = 800;
+        const flameIntro = Math.max(0, Math.min(1, (elapsed - stagger) / flameDuration));
+        const fi = easeInOutCubic(flameIntro);
 
         const orbitDampen = 1 - ep;
         const cx = vw / 2;
         const cy = vh / 2;
         const minDim = Math.min(vw, vh);
         const ringR = cfg.ringRadius * minDim;
-        const ringRotation = time * cfg.orbitSpeed * 0.3;
+
+        // All flames in the same ring rotate at the same speed — formation holds
+        const ringRotation = time * cfg.ringSpeed;
         const baseAngle = cfg.angle + ringRotation;
 
-        const hx =
-          cx +
-          Math.cos(baseAngle) * ringR +
-          Math.cos(time * cfg.orbitSpeed + cfg.phase) * cfg.orbitRadius * orbitDampen;
-        const hy =
-          cy +
-          Math.sin(baseAngle) * ringR +
-          Math.sin(time * cfg.orbitSpeed * 0.7 + cfg.phase) * cfg.orbitRadius * 0.6 * orbitDampen;
+        // 3D orbit: X stays circular, Y is compressed by tilt, Z gives depth
+        const orbitX = Math.cos(baseAngle) * ringR;
+        const orbitZ = Math.sin(baseAngle); // -1 to 1 (behind to front)
+        const orbitY = Math.sin(baseAngle) * ringR * Math.cos(cfg.ringTilt); // compressed Y
+
+        // Depth-based scale: flames in "front" are bigger, "behind" are smaller
+        const depthScale = 0.7 + (orbitZ + 1) * 0.3; // 0.7 to 1.3
+
+        // Fall-in start position: spread across top, above viewport
+        const fallStartX = cx + (seededRandom(i * 19) - 0.5) * vw * 0.8;
+        const fallStartY = -80 - seededRandom(i * 29) * vh * 0.3;
+
+        // Orbit position
+        const orbitPosX = cx + orbitX +
+          Math.cos(time * cfg.wobbleSpeed + cfg.phase) * cfg.wobbleRadius * orbitDampen;
+        const orbitPosY = cy + orbitY +
+          Math.sin(time * cfg.wobbleSpeed * 0.7 + cfg.phase) * cfg.wobbleRadius * 0.6 * orbitDampen;
+
+        // Blend: fall start → orbit position
+        const hx = fallStartX + (orbitPosX - fallStartX) * fi;
+        const hy = fallStartY + (orbitPosY - fallStartY) * fi;
 
         let tx = hx;
         let ty = hy;
+        let targetScale = 1.0;
 
         const cardEl = cardEls[i];
         if (cardEl) {
@@ -123,25 +163,36 @@ export default function FlameField({ selectedIndex, overlayOpen }: Props) {
           const cvy = rect.top + rect.height / 2;
           tx = hx + (cvx - hx) * ep;
           ty = hy + (cvy - hy) * ep;
+
+          // Scale flame to fill 88% of the card when settled
+          targetScale = (rect.width * 0.88) / cfg.size;
         }
 
         const parallaxY = scrollY * (1 - cfg.depth) * 0.2 * orbitDampen;
         const fx = tx - cfg.size / 2;
         const fy = ty - cfg.size / 2 + parallaxY;
 
-        const heroScale = 1.0;
-        const cardScale = 0;
-        const scale = heroScale + (cardScale - heroScale) * ep;
+        // Scale: depth-scaled in hero → fill the card when settled
+        const heroS = depthScale;
+        const scale = heroS + (targetScale - heroS) * ep;
 
-        const breathe =
-          ep > 0.8
-            ? 1 + Math.sin(time * 0.0008 + cfg.phase) * 0.03 * ep
-            : 1;
+        const breathe = 1 + Math.sin(time * 0.0008 + cfg.phase) * 0.02;
 
-        const opacity = ep > 0.85 ? Math.max(0, 1 - (ep - 0.85) / 0.15) : 0.85;
+        // Depth-based opacity in hero (back = dimmer), full when settled
+        const heroOpacity = 0.5 + (orbitZ + 1) * 0.25; // 0.5 to 1.0
+        const baseOpacity = heroOpacity + (0.9 - heroOpacity) * ep;
+        // Fade in during intro
+        const opacity = baseOpacity * Math.min(1, fi * 1.5);
 
         el.style.transform = `translate3d(${fx}px, ${fy}px, 0) scale(${scale * breathe})`;
         el.style.opacity = String(opacity);
+
+        // Glow intensifies when settled
+        const glowEl = el.querySelector('.flame-glow') as HTMLElement;
+        if (glowEl) {
+          const settledGlow = ep > 0.7 ? 0.3 + (ep - 0.7) / 0.3 * 0.25 : 0.3;
+          glowEl.style.opacity = String(settledGlow);
+        }
       });
 
       animRef.current = requestAnimationFrame(animate);

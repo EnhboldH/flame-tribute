@@ -1,14 +1,7 @@
 "use client";
 
 import HeroCanvas from "./HeroCanvas";
-import KheeUgalz from "./KheeUgalz";
-
 export default function Hero() {
-  const handleCta = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    document.getElementById("stories")?.scrollIntoView({ behavior: "smooth" });
-  };
-
   return (
     <section className="hero" id="hero">
       <div className="hero-bg">
@@ -26,7 +19,7 @@ export default function Hero() {
         </h1>
       </div>
 
-      <KheeUgalz variant="mountains" className="hero-mountains" />
+      <div className="hero-mountains" />
 
       <div className="scroll-hint">
         <span />
